@@ -1,7 +1,18 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
-app = FastAPI()
+from app.database import init_db
 
-@app.get("/")
-def read_root():
-    return {"message": "Kvitto Payment API"}
+from app.routers import tariffs
+
+
+@asynccontextmanager #позволяет выполнить код до запуска приложения и после его завершения
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(tariffs.router)
