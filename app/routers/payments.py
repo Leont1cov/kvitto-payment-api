@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.params import Depends
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.params import Depends, Header
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -10,7 +10,25 @@ from app.services.payment_service import create_schedule
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
 @router.post("/", response_model=PaymentResponse, status_code=201)
-def create_payment(payment_data: PaymentCreate, db: Session = Depends(get_db)):
+def create_payment(
+        payment_data: PaymentCreate,
+        response: Response,
+        idempotency_key: str | None = Header(default=None, alias='Idempotency-Key'), #уникальный ключ, чтобы случайно не создавать дважды один и тот же платёж (Header - берем значение из заголовка запроса)
+        db: Session = Depends(get_db)):
+
+    #Проверяем, не создавали ли уже платёж с таким же ключом
+    if idempotency_key is not None:
+        #если ключ передан - ищем в БД платёж с таким же ключом
+        existing_payment = db.query(Payment).filter(
+            Payment.idempotency_key == idempotency_key
+        ).first()
+        if existing_payment is not None:
+            #если платёж найден - возвращаем 200, не создавая новый платёж
+            response.status_code = 200 #изменяем HTTP статус ответа
+            return existing_payment
+
+
+    #Проверка тарифа
     tariff = db.get(Tariff, payment_data.tariff_id)
 
     if tariff is None:
@@ -46,6 +64,7 @@ def create_payment(payment_data: PaymentCreate, db: Session = Depends(get_db)):
         method=payment_data.method,
         installment_months=payment_data.installment_months,
         schedule=schedule,
+        idempotency_key=idempotency_key,
         email=payment_data.email,
     )
 
