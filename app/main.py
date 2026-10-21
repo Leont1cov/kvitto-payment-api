@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from app.database import init_db
 
-from app.routers import tariffs
+from app.routers import tariffs, payments
 
 
 @asynccontextmanager #позволяет выполнить код до запуска приложения и после его завершения
@@ -16,3 +16,4 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(tariffs.router)
+app.include_router(payments.router)
