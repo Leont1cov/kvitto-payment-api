@@ -73,3 +73,10 @@ def create_payment(
     db.refresh(payment)
 
     return payment
+
+@router.get("/{payment_id}", response_model=PaymentResponse)
+def get_payment(payment_id: str, db: Session = Depends(get_db)):
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return payment
