@@ -25,3 +25,9 @@ class PaymentResponse(BaseModel):
     schedule: list[int] | None
     email: str
     created_at: datetime
+
+from typing import Literal
+
+class BankWebhook(BaseModel):
+    payment_id: str
+    status: Literal["succeeded", "failed", "refunded"] #Literal - указываем, что поле status может хранить только 3 значения, остальные получат 422

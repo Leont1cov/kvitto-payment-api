@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Tariff, Payment
-from app.schemas.payment import PaymentResponse, PaymentCreate
+from app.schemas.payment import PaymentResponse, PaymentCreate, BankWebhook
 from app.services.payment_service import create_schedule
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -80,3 +80,24 @@ def get_payment(payment_id: str, db: Session = Depends(get_db)):
     if payment is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     return payment
+
+#Проверяем разрешен ли переход платежа из одного статуса в другой, если разрешен -> обновляем статус в БД
+@router.post("/webhooks/bank")
+def bank_webhook(webhook: BankWebhook, db: Session = Depends(get_db)):
+    payment = db.get(Payment, webhook.payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    #словарь разрешенных переходов
+    allowed_transitions = {
+        "pending": ["succeeded", "failed"],
+        "succeeded": ["refunded"],
+        "failed": [],
+        "refunded": [],
+    }
+    if webhook.status not in allowed_transitions:
+        raise HTTPException(status_code=409, detail={"error": "invalid_transition"})
+    payment.status = webhook.status
+    db.commit()
+
+    return {"result": "ok"}
