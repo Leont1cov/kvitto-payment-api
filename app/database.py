@@ -1,8 +1,10 @@
 import os
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+from app.models import Base, Tariff, Payment
 
 load_dotenv()
 db_user = os.getenv('DB_USER')
@@ -22,3 +24,19 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
+    with SessionLocal() as db:
+        tariffs = [
+            Tariff(id="basic", title="Basic", price=990000),
+            Tariff(id="standard", title="Standard", price=1990000),
+            Tariff(id="premium", title="Premium", price=2990000),
+        ]
+
+        for tariff in tariffs:
+            if db.get(Tariff, tariff.id) is None:
+                db.add(tariff)
+
+        db.commit()
