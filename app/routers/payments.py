@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.params import Depends, Header
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -82,6 +83,7 @@ def get_payment(payment_id: str, db: Session = Depends(get_db)):
     return payment
 
 #Проверяем разрешен ли переход платежа из одного статуса в другой, если разрешен -> обновляем статус в БД
+#функция уведомления от банка
 @router.post("/webhooks/bank")
 def bank_webhook(webhook: BankWebhook, db: Session = Depends(get_db)):
     payment = db.get(Payment, webhook.payment_id)
@@ -95,8 +97,8 @@ def bank_webhook(webhook: BankWebhook, db: Session = Depends(get_db)):
         "failed": [],
         "refunded": [],
     }
-    if webhook.status not in allowed_transitions:
-        raise HTTPException(status_code=409, detail={"error": "invalid_transition"})
+    if webhook.status not in allowed_transitions[payment.status]:
+        return JSONResponse(status_code=409, content={"error": "invalid_transition"})
     payment.status = webhook.status
     db.commit()
 
