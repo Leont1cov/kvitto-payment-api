@@ -1,3 +1,4 @@
+import pytest
 from starlette.testclient import TestClient
 from app.main import app
 
@@ -47,22 +48,50 @@ def test_create_payment_with_lowercase_promo():
     assert payment["amount"] ==  1_791_000 # 1 990 000 - 199 000
     assert payment["discount"] == 199_000 # 10% от стоимости тарифа
 
-#Проверка графика рассрочки - все месячные платежи в сумме дают правильную стоимость
-def test_installment_schedule():
+#проверка ошибочного промокода
+def test_create_payment_with_wrong_promo():
+    response = client.post("/payments/", json={
+        "tariff_id": "standard",
+        "email": "test@example.com",
+        "method": "card",
+        "promo_code": "INVALID"
+    })
+
+    assert response.status_code == 422
+
+#Проверка графика рассрочки на 3,6,12 месяцев - все месячные платежи в сумме дают правильную стоимость
+@pytest.mark.parametrize("months", [3, 6, 12]) #запускает тест 3 раза подставляя разные значения
+def test_installment_schedule(months):
     response = client.post("/payments/", json={
         "tariff_id": "standard",
         "email": "test@example.com",
         "method": "installment",
-        "installment_months": 3
+        "installment_months": months
     })
+
     assert response.status_code == 201
 
     payment = response.json()
     schedule = payment["schedule"]
 
-    assert len(schedule) == 3 #проверяем график на 3 платежа
-    assert sum(schedule) == payment["amount"] #проверяем сумму - получается ли итоговая
-    assert schedule == [663334, 663333, 663333] #проверяем распределение остатка
+    assert len(schedule) == months
+    assert sum(schedule) == payment["amount"]
+
+    # Для 3 месяцев дополнительно проверяем распределение остатка
+    if months == 3:
+        assert schedule == [663334, 663333, 663333]
+
+
+# Проверяем, что нельзя оформить рассрочку на 5 месяцев
+def test_installment_invalid_months():
+    response = client.post("/payments/", json={
+        "tariff_id": "standard",
+        "email": "test@example.com",
+        "method": "installment",
+        "installment_months": 5
+    })
+
+    assert response.status_code == 422
 
 
 from uuid import uuid4 #для получения уникального ключа
@@ -135,4 +164,13 @@ def test_payment_not_found():
     response = client.get("/payments/nonexistent-payment-id")
 
     # Проверяем, что API вернула 404
+    assert response.status_code == 404
+
+# Проверяем webhook для несуществующего платежа
+def test_webhook_payment_not_found():
+    response = client.post("/webhooks/bank", json={
+        "payment_id": "nonexistent-payment-id",
+        "status": "succeeded"
+    })
+
     assert response.status_code == 404
