@@ -9,6 +9,7 @@ from app.schemas.payment import PaymentResponse, PaymentCreate, BankWebhook
 from app.services.payment_service import create_schedule
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
+webhook_router = APIRouter(tags=["webhooks"])
 
 @router.post("/", response_model=PaymentResponse, status_code=201)
 def create_payment(
@@ -56,10 +57,10 @@ def create_payment(
     elif payment_data.installment_months is not None:
         raise HTTPException(status_code=422, detail="Installment months are only allowed for installment payments")
 
-    import uuid
+    from uuid import uuid4
 
     payment = Payment(
-        id=str(uuid.uuid4()), # генерирует уникальный ID платежа
+        id=str(uuid4()), # генерирует уникальный ID платежа
         status="pending",
         tariff_id=tariff.id,
         amount=amount,
@@ -86,7 +87,7 @@ def get_payment(payment_id: str, db: Session = Depends(get_db)):
 
 #Проверяем разрешен ли переход платежа из одного статуса в другой, если разрешен -> обновляем статус в БД
 #функция уведомления от банка
-@router.post("/webhooks/bank")
+@webhook_router.post("/webhooks/bank")
 def bank_webhook(webhook: BankWebhook, db: Session = Depends(get_db)):
     payment = db.get(Payment, webhook.payment_id)
     if payment is None:

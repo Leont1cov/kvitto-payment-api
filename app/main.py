@@ -17,3 +17,4 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(tariffs.router)
 app.include_router(payments.router)
+app.include_router(payments.webhook_router)
