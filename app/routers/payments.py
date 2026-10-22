@@ -40,7 +40,7 @@ def create_payment(
 
     if payment_data.promo_code is not None:
         if payment_data.promo_code.upper() != "KVITTO10":
-            raise HTTPException(status_code=404, detail="Promo code is not supported")
+            raise HTTPException(status_code=422, detail="Promo code is not supported")
 
         discount = tariff.price // 10
 
@@ -53,6 +53,8 @@ def create_payment(
         if payment_data.installment_months not in [3, 6, 12]: #допустимы только 3,6,12 месяцев
             raise HTTPException(status_code=422, detail="Invalid installment months")
         schedule = create_schedule(amount, payment_data.installment_months) #распределяем итогувую сумму по месяцам
+    elif payment_data.installment_months is not None:
+        raise HTTPException(status_code=422, detail="Installment months are only allowed for installment payments")
 
     import uuid
 
